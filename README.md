@@ -5,6 +5,8 @@ Toy BASIC-like language and interpreter implemented in C for study or interview 
 Requirements:
 - C compiler such as GCC or Clang
 
+For syntax examples, see `example.bas`.
+
 To build weebasic:
 
 ```
@@ -14,5 +16,5 @@ To build weebasic:
 To execute programs, run:
 
 ```
-./weebasic <source_file.bas>
+./weebasic example.bas
 ```

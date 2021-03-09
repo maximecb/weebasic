@@ -28,11 +28,10 @@ typedef enum
     OP_GETLOCAL,
     OP_SETLOCAL,
     OP_LT,
-    OP_BRANCHIF,
-    OP_JUMP,
+    OP_IFNOT,
     OP_ADD,
     OP_SUB,
-    OP_READ,
+    OP_READINT,
     OP_PRINT
 } opcode_t;
 
@@ -162,6 +161,7 @@ void parse_ident(char** pstr, char* ident_out)
 
             // Move to the next character
             (*pstr)++;
+            continue;
         }
 
         break;
@@ -177,7 +177,7 @@ void parse_ident(char** pstr, char* ident_out)
     ident_out[ident_len] = '\0';
 }
 
-// Parse an integer constant
+// Parse a positive integer constant
 int64_t parse_int(char** pstr)
 {
     int64_t num = 0;
@@ -216,19 +216,31 @@ local_t* find_local(local_t* local_vars, const char* ident)
     return NULL;
 }
 
-// Parse an expression
-void parse_expr(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
+// Macros to append an instruction to the program
+#define APPEND_INSN(op_type) ( insns[(*insn_idx)++] = (instr_t){ op_type }, &insns[(*insn_idx)-1] )
+#define APPEND_INSN_IMM(op_type, imm) ( insns[(*insn_idx)++] = (instr_t){ op_type, imm }, &insns[(*insn_idx)-1] )
+
+// Parse an atomic expression
+void parse_atom(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
 {
     char ch = **pstr;
+
+    // Read an integer from the console
+    if (match_keyword(pstr, "read_int"))
+    {
+        APPEND_INSN(OP_READINT);
+        return;
+    }
 
     // Integer constant
     if (ch >= '0' && ch <= '9')
     {
         int64_t num = parse_int(pstr);
-        insns[(*insn_idx)++] = (instr_t){ OP_PUSH, num };
+        APPEND_INSN_IMM(OP_PUSH, num);
         return;
     }
 
+    // Reference to a variable
     if (ch >= 'a' && ch <= 'z')
     {
         // Parse the variable name
@@ -244,16 +256,157 @@ void parse_expr(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
             exit(-1);
         }
 
-        insns[(*insn_idx)++] = (instr_t){ OP_GETLOCAL, local->idx };
+        APPEND_INSN_IMM(OP_GETLOCAL, local->idx);
         return;
     }
-
 
     fprintf(stderr, "invalid expression");
     exit(-1);
 }
 
-instr_t* parse(const char* file_name)
+// Parse an expression
+void parse_expr(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
+{
+    // Parse a first expression
+    parse_atom(pstr, insns, insn_idx, locals);
+
+    eat_ws(pstr);
+
+    char ch = **pstr;
+
+    if (match_keyword(pstr, "+"))
+    {
+        // Parse the RHS expression
+        parse_atom(pstr, insns, insn_idx, locals);
+
+        // Add the result
+        APPEND_INSN(OP_ADD);
+        return;
+    }
+
+    if (match_keyword(pstr, "-"))
+    {
+        // Parse the RHS expression
+        parse_atom(pstr, insns, insn_idx, locals);
+
+        // Subtract the result
+        APPEND_INSN(OP_SUB);
+        return;
+    }
+
+    if (match_keyword(pstr, "<"))
+    {
+        // Parse the RHS expression
+        parse_atom(pstr, insns, insn_idx, locals);
+
+        // Compare the arguments
+        APPEND_INSN(OP_LT);
+        return;
+    }
+}
+
+// Parse a statement
+void parse_stmt(char** pstr, instr_t* insns, size_t* insn_idx, local_t** plocals)
+{
+    // Consume whitespace
+    eat_ws(pstr);
+
+    // Single-line comments
+    if (match_keyword(pstr, "#"))
+    {
+        eat_comment(pstr);
+        return;
+    }
+
+    // Local variable declaration
+    if (match_keyword(pstr, "let"))
+    {
+        // Parse the variable name
+        char ident[MAX_IDENT_LEN];
+        parse_ident(pstr, ident);
+
+        expect_keyword(pstr, "=");
+
+        // Parse the expression we are assigning
+        parse_expr(pstr, insns, insn_idx, *plocals);
+
+        // Make sure this isn't a redeclaration
+        local_t* first_local = *plocals;
+        if (find_local(first_local, ident))
+        {
+            fprintf(stderr, "local variable \"%s\" already declared\n", ident);
+            exit(-1);
+        }
+
+        // Create a new local variable
+        local_t* new_local = malloc(sizeof(local_t));
+        strcpy(new_local->ident, ident);
+        new_local->idx = first_local? (first_local->idx + 1):0;
+        new_local->next = first_local;
+        *plocals = new_local;
+
+        // Set the local to the expression's value
+        APPEND_INSN_IMM(OP_SETLOCAL, new_local->idx);
+
+        return;
+    }
+
+    if (match_keyword(pstr, "if"))
+    {
+        // Parse the test expression
+        parse_expr(pstr, insns, insn_idx, *plocals);
+
+        expect_keyword(pstr, "then");
+
+        // If the result is false, jump past the if clause
+        instr_t* ifnot_insn = APPEND_INSN_IMM(OP_IFNOT, 0);
+
+        // Parse the body of the if statement
+        parse_stmt(pstr, insns, insn_idx, plocals);
+
+        // If the condition is false, we jump after the body of the if
+        instr_t* pfalse = &insns[*insn_idx];
+        ifnot_insn->int_val = (pfalse - ifnot_insn) - 1;
+
+        return;
+    }
+
+    // Sequencing of statements
+    if (match_keyword(pstr, "begin"))
+    {
+        while (true)
+        {
+            if (match_keyword(pstr, "end"))
+            {
+                break;
+            }
+
+            parse_stmt(pstr, insns, insn_idx, plocals);
+        }
+
+        return;
+    }
+
+    // Print to stdout
+    if (match_keyword(pstr, "print"))
+    {
+        parse_expr(pstr, insns, insn_idx, *plocals);
+        APPEND_INSN(OP_PRINT);
+        return;
+    }
+
+    // Cap the string length for printing
+    if (strlen(*pstr) > 10)
+    {
+        (*pstr)[10] = '\0';
+    }
+
+    fprintf(stderr, "invalid statement: \"%s [...]\"\n", *pstr);
+    exit(-1);
+}
+
+// Parse a source file into a sequence of instructions
+instr_t* parse_file(const char* file_name)
 {
     FILE* file = fopen(file_name, "r");
 
@@ -286,76 +439,13 @@ instr_t* parse(const char* file_name)
     // Until we reach the end of the input
     while (true)
     {
-        // Consume whitespace
-        eat_ws(pstr);
-
         // End of input
         if (*current_ch == '\0')
         {
             break;
         }
 
-        if (*current_ch == '#')
-        {
-            eat_comment(pstr);
-            continue;
-        }
-
-        // Local variable declaration
-        if (match_keyword(pstr, "let"))
-        {
-            // Parse the variable name
-            char ident[MAX_IDENT_LEN];
-            parse_ident(pstr, ident);
-
-            expect_keyword(pstr, "=");
-
-            // Parse the expression we are assigning
-            parse_expr(pstr, insns, &insn_idx, local_vars);
-
-            printf("got let, ident=\"%s\"\n", ident);
-
-            // Make sure this isn't a redeclaration
-            if (find_local(local_vars, ident))
-            {
-                fprintf(stderr, "local variable \"%s\" already declared\n", ident);
-                exit(-1);
-            }
-
-            // Create a new local variable
-            local_t* new_local = malloc(sizeof(local_t));
-            strcpy(new_local->ident, ident);
-            new_local->idx = local_vars? (local_vars->idx + 1):0;
-            new_local->next = local_vars;
-            local_vars = new_local;
-
-            // Set the local to the expression's value
-            insns[insn_idx++] = (instr_t){ OP_SETLOCAL, new_local->idx };
-            continue;
-        }
-
-        if (match_keyword(pstr, "if"))
-        {
-            // TODO
-            assert (false);
-            continue;
-        }
-
-        if (match_keyword(pstr, "print"))
-        {
-            parse_expr(pstr, insns, &insn_idx, local_vars);
-            insns[insn_idx++] = (instr_t){ OP_PRINT };
-            continue;
-        }
-
-        // Cap the string length for printing
-        if (strlen(*pstr) > 10)
-        {
-            (*pstr)[10] = '\0';
-        }
-
-        fprintf(stderr, "invalid statement: \"%s [...]\"\n", *pstr);
-        exit(-1);
+        parse_stmt(pstr, insns, &insn_idx, &local_vars);
     }
 
     free(input_str);
@@ -398,12 +488,10 @@ void eval(const instr_t* insns)
             return;
 
             case OP_PUSH:
-            //printf("pushing constant: %lld\n", pc->int_val);
             PUSH(pc->int_val);
             break;
 
             case OP_SETLOCAL:
-            //printf("setlocal, idx=%llu\n", pc->idx);
             vars[pc->idx] = POP();
             break;
 
@@ -411,9 +499,60 @@ void eval(const instr_t* insns)
             PUSH(vars[pc->idx]);
             break;
 
+            case OP_LT:
+            {
+                int64_t arg1 = POP();
+                int64_t arg0 = POP();
+                PUSH((arg0 < arg1)? 1:0);
+            }
+            break;
 
+            case OP_IFNOT:
+            {
+                int64_t test_val = POP();
 
+                if (!test_val)
+                {
+                    uint64_t jump_offset = pc->int_val;
+                    pc += jump_offset;
+                }
+            }
+            break;
 
+            case OP_ADD:
+            {
+                int64_t arg1 = POP();
+                int64_t arg0 = POP();
+                PUSH(arg0 + arg1);
+            }
+            break;
+
+            case OP_SUB:
+            {
+                int64_t arg1 = POP();
+                int64_t arg0 = POP();
+                PUSH(arg0 - arg1);
+            }
+            break;
+
+            case OP_READINT:
+            {
+                printf("Input an integer value:\n");
+                printf("> ");
+
+                int64_t int_val = 0;
+                while (true)
+                {
+                    char c = fgetc(stdin);
+                    if (c == EOF || c < '0' || c > '9')
+                        break;
+                    int64_t digit = c - '0';
+                    int_val = 10 * int_val + digit;
+                }
+
+                PUSH(int_val);
+            }
+            break;
 
             case OP_PRINT:
             {
@@ -433,7 +572,7 @@ int main(int argc, char** argv)
 {
     if (argc == 2)
     {
-        instr_t* insns = parse(argv[1]);
+        instr_t* insns = parse_file(argv[1]);
         eval(insns);
     }
 
