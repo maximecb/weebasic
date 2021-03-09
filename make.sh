@@ -1,1 +1,1 @@
-gcc -o weebasic weebasic.c
+cc -o weebasic weebasic.c
