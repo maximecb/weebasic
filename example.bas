@@ -1,2 +1,6 @@
+# Assignment statements
+let x = 76
 
-print 10
+
+
+print x
