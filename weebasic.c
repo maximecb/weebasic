@@ -1,3 +1,7 @@
+#include "stdio.h"
+#include "string.h"
+#include "assert.h"
+
 typedef enum
 {
     OP_PUSH_IMM,
@@ -19,9 +23,20 @@ typedef struct
     }
 } instr_t;
 
-void parse(const char* file_name)
+instr_t* parse(const char* file_name)
 {
-    
+    return NULL;
+}
+
+int64_t tag(int64_t int)
+{
+    return (int << 1) | 1;
+}
+
+int64_t untag(int64_t word)
+{
+    assert (word & 1);
+    return word >> 1;
 }
 
 void eval(const instr_t* insns)
