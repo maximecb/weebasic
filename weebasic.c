@@ -7,6 +7,7 @@ typedef enum
     OP_ADD,
     OP_SUB,
     OP_PRINT
+    OP_EXIT
 } opcode_t;
 
 typedef struct
@@ -18,11 +19,34 @@ typedef struct
     }
 } instr_t;
 
-void eval()
+void parse(const char* file_name)
 {
+    
+}
+
+void eval(const instr_t* insns)
+{
+    for (const instr_t* pc = insns; pc != NULL; ++pc)
+    {
+        switch (pc->op)
+        {
+
+
+
+            case OP_EXIT:
+            return;
+        }
+    }    
 }
 
 int main(int argc, char** argv)
 {
+    if (argc == 2)
+    {
+        
+        
+        
+    }
+    
     return 0;
 }
