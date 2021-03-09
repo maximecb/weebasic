@@ -301,6 +301,7 @@ instr_t* parse(const char* file_name)
             continue;
         }
 
+        // Local variable declaration
         if (match_keyword(pstr, "let"))
         {
             // Parse the variable name
@@ -330,6 +331,14 @@ instr_t* parse(const char* file_name)
 
             // Set the local to the expression's value
             insns[insn_idx++] = (instr_t){ OP_SETLOCAL, new_local->idx };
+            continue;
+        }
+
+        if (match_keyword(pstr, "if"))
+        {
+            // TODO
+            assert (false);
+            continue;
         }
 
         if (match_keyword(pstr, "print"))
@@ -339,7 +348,13 @@ instr_t* parse(const char* file_name)
             continue;
         }
 
-        fprintf(stderr, "invalid statement\n");
+        // Cap the string length for printing
+        if (strlen(*pstr) > 10)
+        {
+            (*pstr)[10] = '\0';
+        }
+
+        fprintf(stderr, "invalid statement: \"%s [...]\"\n", *pstr);
         exit(-1);
     }
 
