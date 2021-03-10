@@ -401,6 +401,16 @@ void parse_stmt(char** pstr, instr_t* insns, size_t* insn_idx, local_t** plocals
         (*pstr)[10] = '\0';
     }
 
+    // Remove newlines from printout
+    for (int i = 0;; ++i)
+    {
+        char ch = (*pstr)[i];
+        if (ch == '\r' || ch == '\n')
+            (*pstr)[i] = ' ';
+        if (ch == '\0')
+            break;
+    }
+
     fprintf(stderr, "invalid statement: \"%s [...]\"\n", *pstr);
     exit(-1);
 }
