@@ -13,6 +13,7 @@
 #include "stdlib.h"
 #include "stdio.h"
 #include "string.h"
+#include "ctype.h"
 #include "assert.h"
 
 // 64K instructions should be enough for anybody
@@ -155,17 +156,17 @@ void parse_ident(char** pstr, char* ident_out)
             exit(-1);
         }
 
-        if (ch >= 'a' && ch <= 'z')
+        if (!isalnum(ch) && ch != '_')
         {
-            ident_out[ident_len] = ch;
-            ident_len++;
-
-            // Move to the next character
-            (*pstr)++;
-            continue;
+            break;
         }
 
-        break;
+        // Store this character
+        ident_out[ident_len] = ch;
+        ident_len++;
+
+        // Move to the next character
+        (*pstr)++;
     }
 
     if (ident_len == 0)
@@ -187,17 +188,15 @@ int64_t parse_int(char** pstr)
     {
         char ch = **pstr;
 
-        if (ch >= '0' && ch <= '9')
-        {
-            int64_t digit = ch - '0';
-            num = 10 * num + digit;
+        if (!isdigit(ch))
+            break;
 
-            // Move to the next character
-            (*pstr)++;
-            continue;
-        }
+        // Store this digit
+        int64_t digit = ch - '0';
+        num = 10 * num + digit;
 
-        break;
+        // Move to the next character
+        (*pstr)++;
     }
 
     return num;
@@ -234,7 +233,7 @@ void parse_atom(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
     }
 
     // Integer constant
-    if (ch >= '0' && ch <= '9')
+    if (isdigit(ch))
     {
         int64_t num = parse_int(pstr);
         APPEND_INSN_IMM(OP_PUSH, num);
@@ -242,7 +241,7 @@ void parse_atom(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
     }
 
     // Reference to a variable
-    if (ch >= 'a' && ch <= 'z')
+    if (isalpha(ch) || ch == '_')
     {
         // Parse the variable name
         char ident[MAX_IDENT_LEN];
@@ -545,7 +544,7 @@ void eval(const instr_t* insns)
                 while (true)
                 {
                     char c = fgetc(stdin);
-                    if (c == EOF || c < '0' || c > '9')
+                    if (c == EOF || !isdigit(c))
                         break;
                     int64_t digit = c - '0';
                     int_val = 10 * int_val + digit;
@@ -558,7 +557,7 @@ void eval(const instr_t* insns)
             case OP_PRINT:
             {
                 int64_t int_val = POP();
-                printf("print: %ld\n", int_val);
+                printf("print: %lld\n", (long long)int_val);
             }
             break;
 
