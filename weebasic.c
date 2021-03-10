@@ -9,6 +9,7 @@
 ****************************************************************************/
 
 #include "stdbool.h"
+#include "stdint.h"
 #include "stdlib.h"
 #include "stdio.h"
 #include "string.h"
@@ -557,7 +558,7 @@ void eval(const instr_t* insns)
             case OP_PRINT:
             {
                 int64_t int_val = POP();
-                printf("print: %lld\n", int_val);
+                printf("print: %ld\n", int_val);
             }
             break;
 
