@@ -37,17 +37,31 @@ typedef enum
     OP_PRINT
 } opcode_t;
 
+// Heap-allocated string object
+typedef struct
+{
+    // String length, excluding null-terminator
+    size_t len;
+
+    // String data
+    const char* data;
+
+} string_t;
+
+typedef union
+{
+    uint64_t idx;
+    int64_t int_val;
+    double float_val;
+    string_t* str;
+
+} value_t;
+
 // Format of the instructions we implement
 typedef struct
 {
     opcode_t op;
-
-    union
-    {
-        uint64_t idx;
-        int64_t int_val;
-        const char* str_val;
-    };
+    value_t imm;
 
 } instr_t;
 
@@ -64,6 +78,22 @@ typedef struct LocalVar
     struct LocalVar* next;
 
 } local_t;
+
+value_t tag(int64_t val)
+{
+    return (value_t)((val << 1) | 1);
+}
+
+int64_t untag(value_t val)
+{
+    assert (val.int_val & 1);
+    return val.int_val >> 1;
+}
+
+bool is_int(value_t val)
+{
+    return val.int_val & 1;
+}
 
 // Consume whitespace chars in the input
 void eat_ws(char** pstr)
@@ -366,7 +396,7 @@ void parse_stmt(char** pstr, instr_t* insns, size_t* insn_idx, local_t** plocals
 
         // If the condition is false, we jump after the body of the if
         instr_t* pfalse = &insns[*insn_idx];
-        ifnot_insn->int_val = (pfalse - ifnot_insn) - 1;
+        ifnot_insn->imm.int_val = (pfalse - ifnot_insn) - 1;
 
         return;
     }
@@ -463,17 +493,6 @@ instr_t* parse_file(const char* file_name)
     return insns;
 }
 
-int64_t tag(int64_t val)
-{
-    return (val << 1) | 1;
-}
-
-int64_t untag(int64_t word)
-{
-    assert (word & 1);
-    return word >> 1;
-}
-
 // Stack manipulation primitives
 #define PUSH(v) ( stack[stack_size] = v, stack_size++ )
 #define POP() ( stack_size--, stack[stack_size] )
@@ -481,10 +500,10 @@ int64_t untag(int64_t word)
 void eval(const instr_t* insns)
 {
     // Local variables
-    int64_t vars[MAX_LOCALS];
+    value_t vars[MAX_LOCALS];
 
     // Stack of temporary values
-    int64_t stack[MAX_STACK];
+    value_t stack[MAX_STACK];
     size_t stack_size = 0;
 
     for (const instr_t* pc = insns; pc != NULL; ++pc)
@@ -498,32 +517,33 @@ void eval(const instr_t* insns)
             return;
 
             case OP_PUSH:
-            PUSH(pc->int_val);
+            PUSH(pc->imm);
             break;
 
             case OP_SETLOCAL:
-            vars[pc->idx] = POP();
+            vars[pc->imm.idx] = POP();
             break;
 
             case OP_GETLOCAL:
-            PUSH(vars[pc->idx]);
+            PUSH(vars[pc->imm.idx]);
             break;
 
             case OP_LT:
             {
-                int64_t arg1 = POP();
-                int64_t arg0 = POP();
-                PUSH((arg0 < arg1)? 1:0);
+                int64_t arg1 = POP().int_val;
+                int64_t arg0 = POP().int_val;
+                int64_t bool_val = (arg0 < arg1)? 1:0;
+                PUSH((value_t)bool_val);
             }
             break;
 
             case OP_IFNOT:
             {
-                int64_t test_val = POP();
+                int64_t test_val = POP().int_val;
 
-                if (!test_val)
+                if (test_val == 0)
                 {
-                    uint64_t jump_offset = pc->int_val;
+                    uint64_t jump_offset = pc->imm.int_val;
                     pc += jump_offset;
                 }
             }
@@ -531,17 +551,17 @@ void eval(const instr_t* insns)
 
             case OP_ADD:
             {
-                int64_t arg1 = POP();
-                int64_t arg0 = POP();
-                PUSH(arg0 + arg1);
+                int64_t arg1 = POP().int_val;
+                int64_t arg0 = POP().int_val;
+                PUSH((value_t)(arg0 + arg1));
             }
             break;
 
             case OP_SUB:
             {
-                int64_t arg1 = POP();
-                int64_t arg0 = POP();
-                PUSH(arg0 - arg1);
+                int64_t arg1 = POP().int_val;
+                int64_t arg0 = POP().int_val;
+                PUSH((value_t)(arg0 - arg1));
             }
             break;
 
@@ -560,13 +580,13 @@ void eval(const instr_t* insns)
                     int_val = 10 * int_val + digit;
                 }
 
-                PUSH(int_val);
+                PUSH((value_t)int_val);
             }
             break;
 
             case OP_PRINT:
             {
-                int64_t int_val = POP();
+                int64_t int_val = POP().int_val;
                 printf("print: %lld\n", (long long)int_val);
             }
             break;
