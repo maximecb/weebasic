@@ -39,11 +39,11 @@ typedef enum
     OP_PRINT
 } opcode_t;
 
-// Heap-allocated string object
+// Immutable, heap-allocated string object
 typedef struct
 {
     // String length, excluding null-terminator
-    size_t len;
+    const size_t len;
 
     // String data
     const char* data;
@@ -54,7 +54,6 @@ typedef union
 {
     uint64_t idx;
     int64_t int_val;
-    double float_val;
     string_t* str;
 
 } value_t;

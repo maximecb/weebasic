@@ -13,7 +13,7 @@ To build weebasic:
 ./make.sh
 ```
 
-To test that weebasic is running correctly:
+To test that weebasic is working correctly:
 
 ```
 ./weebasic tests.bas
