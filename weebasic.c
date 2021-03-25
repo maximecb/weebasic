@@ -80,6 +80,11 @@ typedef struct LocalVar
 
 } local_t;
 
+bool is_int(value_t val)
+{
+    return val.int_val & 1;
+}
+
 value_t tag(int64_t val)
 {
     return (value_t)((val << 1) | 1);
@@ -87,13 +92,8 @@ value_t tag(int64_t val)
 
 int64_t untag(value_t val)
 {
-    assert (val.int_val & 1);
+    assert (is_int(val));
     return val.int_val >> 1;
-}
-
-bool is_int(value_t val)
-{
-    return val.int_val & 1;
 }
 
 // Consume whitespace chars in the input
@@ -513,6 +513,7 @@ instr_t* parse_file(const char* file_name)
 #define PUSH(v) ( stack[stack_size] = v, stack_size++ )
 #define POP() ( stack_size--, stack[stack_size] )
 
+// Evaluate/run a program
 void eval(const instr_t* insns)
 {
     // Local variables
@@ -564,7 +565,7 @@ void eval(const instr_t* insns)
 
                 if (test_val != 0)
                 {
-                    uint64_t jump_offset = pc->imm.int_val;
+                    int64_t jump_offset = pc->imm.int_val;
                     pc += jump_offset;
                 }
             }
@@ -576,7 +577,7 @@ void eval(const instr_t* insns)
 
                 if (test_val == 0)
                 {
-                    uint64_t jump_offset = pc->imm.int_val;
+                    int64_t jump_offset = pc->imm.int_val;
                     pc += jump_offset;
                 }
             }
