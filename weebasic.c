@@ -30,6 +30,7 @@ typedef enum
     OP_PUSH,
     OP_GETLOCAL,
     OP_SETLOCAL,
+    OP_EQ,
     OP_LT,
     OP_IF,
     OP_IFNOT,
@@ -146,15 +147,15 @@ void eat_comment(char** pstr)
     }
 }
 
-// Match a keyword in the input
-bool match_keyword(char** pstr, const char* keyword)
+// Match a token in the input
+bool match_token(char** pstr, const char* token)
 {
     eat_ws(pstr);
 
-    size_t len_kw = strlen(keyword);
-    if (strncmp(*pstr, keyword, len_kw) == 0)
+    size_t len_tok = strlen(token);
+    if (strncmp(*pstr, token, len_tok) == 0)
     {
-        *pstr += len_kw;
+        *pstr += len_tok;
         eat_ws(pstr);
         return true;
     }
@@ -162,12 +163,12 @@ bool match_keyword(char** pstr, const char* keyword)
     return false;
 }
 
-// Fail to parse if a given keyword is not there
-void expect_keyword(char** pstr, const char* keyword)
+// Fail to parse if a given token is not there
+void expect_token(char** pstr, const char* token)
 {
-    if (!match_keyword(pstr, keyword))
+    if (!match_token(pstr, token))
     {
-        fprintf(stderr, "expected keyword \"%s\"\n", keyword);
+        fprintf(stderr, "expected token \"%s\"\n", token);
         exit(-1);
     }
 }
@@ -257,7 +258,7 @@ void parse_atom(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
     char ch = **pstr;
 
     // Read an integer from the console
-    if (match_keyword(pstr, "read_int"))
+    if (match_token(pstr, "read_int"))
     {
         APPEND_INSN(OP_READINT);
         return;
@@ -305,7 +306,7 @@ void parse_expr(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
 
     char ch = **pstr;
 
-    if (match_keyword(pstr, "+"))
+    if (match_token(pstr, "+"))
     {
         // Parse the RHS expression
         parse_atom(pstr, insns, insn_idx, locals);
@@ -315,7 +316,7 @@ void parse_expr(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
         return;
     }
 
-    if (match_keyword(pstr, "-"))
+    if (match_token(pstr, "-"))
     {
         // Parse the RHS expression
         parse_atom(pstr, insns, insn_idx, locals);
@@ -325,7 +326,17 @@ void parse_expr(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
         return;
     }
 
-    if (match_keyword(pstr, "<"))
+    if (match_token(pstr, "=="))
+    {
+        // Parse the RHS expression
+        parse_atom(pstr, insns, insn_idx, locals);
+
+        // Compare the arguments
+        APPEND_INSN(OP_EQ);
+        return;
+    }
+
+    if (match_token(pstr, "<"))
     {
         // Parse the RHS expression
         parse_atom(pstr, insns, insn_idx, locals);
@@ -343,20 +354,20 @@ void parse_stmt(char** pstr, instr_t* insns, size_t* insn_idx, local_t** plocals
     eat_ws(pstr);
 
     // Single-line comments
-    if (match_keyword(pstr, "#"))
+    if (match_token(pstr, "#"))
     {
         eat_comment(pstr);
         return;
     }
 
     // Local variable declaration
-    if (match_keyword(pstr, "let"))
+    if (match_token(pstr, "let"))
     {
         // Parse the variable name
         char ident[MAX_IDENT_LEN];
         parse_ident(pstr, ident);
 
-        expect_keyword(pstr, "=");
+        expect_token(pstr, "=");
 
         // Parse the expression we are assigning
         parse_expr(pstr, insns, insn_idx, *plocals);
@@ -382,12 +393,12 @@ void parse_stmt(char** pstr, instr_t* insns, size_t* insn_idx, local_t** plocals
         return;
     }
 
-    if (match_keyword(pstr, "if"))
+    if (match_token(pstr, "if"))
     {
         // Parse the test expression
         parse_expr(pstr, insns, insn_idx, *plocals);
 
-        expect_keyword(pstr, "then");
+        expect_token(pstr, "then");
 
         // If the result is false, jump past the if clause
         instr_t* ifnot_insn = APPEND_INSN_IMM(OP_IFNOT, 0);
@@ -403,11 +414,11 @@ void parse_stmt(char** pstr, instr_t* insns, size_t* insn_idx, local_t** plocals
     }
 
     // Sequencing of statements
-    if (match_keyword(pstr, "begin"))
+    if (match_token(pstr, "begin"))
     {
         while (true)
         {
-            if (match_keyword(pstr, "end"))
+            if (match_token(pstr, "end"))
             {
                 break;
             }
@@ -419,7 +430,7 @@ void parse_stmt(char** pstr, instr_t* insns, size_t* insn_idx, local_t** plocals
     }
 
     // Print to stdout
-    if (match_keyword(pstr, "print"))
+    if (match_token(pstr, "print"))
     {
         parse_expr(pstr, insns, insn_idx, *plocals);
         APPEND_INSN(OP_PRINT);
@@ -427,7 +438,7 @@ void parse_stmt(char** pstr, instr_t* insns, size_t* insn_idx, local_t** plocals
     }
 
     // Print to stdout
-    if (match_keyword(pstr, "assert"))
+    if (match_token(pstr, "assert"))
     {
         // Parse the condition
         parse_expr(pstr, insns, insn_idx, *plocals);
@@ -548,6 +559,15 @@ void eval(const instr_t* insns)
 
             case OP_GETLOCAL:
             PUSH(vars[pc->imm.idx]);
+            break;
+
+            case OP_EQ:
+            {
+                int64_t arg1 = POP().int_val;
+                int64_t arg0 = POP().int_val;
+                int64_t bool_val = (arg0 == arg1)? 1:0;
+                PUSH((value_t)bool_val);
+            }
             break;
 
             case OP_LT:

@@ -1,14 +1,16 @@
 # Nonzero is true, 0 is false
-assert 1 
+assert 1
 #assert 0
 
 # Basic arithmetic
+assert 1 == 1
 assert 1 < 2
 assert 1 + 2
 
 # Local variables
 let x = 1
 assert x
+assert x == 1
 
 # If statements
 if 0 then assert 0
