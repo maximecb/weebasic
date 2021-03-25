@@ -16,11 +16,12 @@ I'm going to ask you to implement new features in `weebasic`. For example, I mig
 constructs or to add support for new data types in the language.
 
 The primary purpose is to evaluate your knowledge
-of C and systems programming, and to see if you understand how a very simple parser and bytecode interpreter works.
+of C and systems programming, and to see if you understand how a simple parser and bytecode interpreter works.
 I'm also assessing your communication and problem-solving skills. You should try to roughly explain what you are doing
 as you do it, and you are allowed to ask as many clarifying questions as necessary during the interview.
 
-I am a friendly interviewer and the interview isn't designed to cause you stress. Your solution doesn't need to be
+I'm a friendly interviewer and my goal is to help you succeed. The interview isn't designed to cause you stress.
+Your solution doesn't need to be
 perfect and you don't need to worry about performance. Typically, the simplest viable solution is the expected answer.
 
 ## Installation
