@@ -26,10 +26,12 @@
 typedef enum
 {
     OP_EXIT = 0,
+    OP_ERROR,
     OP_PUSH,
     OP_GETLOCAL,
     OP_SETLOCAL,
     OP_LT,
+    OP_IF,
     OP_IFNOT,
     OP_ADD,
     OP_SUB,
@@ -425,6 +427,21 @@ void parse_stmt(char** pstr, instr_t* insns, size_t* insn_idx, local_t** plocals
         return;
     }
 
+    // Print to stdout
+    if (match_keyword(pstr, "assert"))
+    {
+        // Parse the condition
+        parse_expr(pstr, insns, insn_idx, *plocals);
+
+        // If the result is true, jump over the error instruction
+        APPEND_INSN_IMM(OP_IF, 1);
+
+        // Exit with an error
+        APPEND_INSN(OP_ERROR);
+
+        return;
+    }
+
     // Cap the string length for printing
     if (strlen(*pstr) > 10)
     {
@@ -516,6 +533,11 @@ void eval(const instr_t* insns)
             case OP_EXIT:
             return;
 
+            case OP_ERROR:
+            fprintf(stderr, "Run-time error\n");
+            exit(-1);
+            return;
+
             case OP_PUSH:
             PUSH(pc->imm);
             break;
@@ -534,6 +556,18 @@ void eval(const instr_t* insns)
                 int64_t arg0 = POP().int_val;
                 int64_t bool_val = (arg0 < arg1)? 1:0;
                 PUSH((value_t)bool_val);
+            }
+            break;
+
+            case OP_IF:
+            {
+                int64_t test_val = POP().int_val;
+
+                if (test_val != 0)
+                {
+                    uint64_t jump_offset = pc->imm.int_val;
+                    pc += jump_offset;
+                }
             }
             break;
 

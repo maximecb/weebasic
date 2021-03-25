@@ -5,12 +5,18 @@ Toy BASIC-like language and interpreter implemented in C for study or interview 
 Requirements:
 - C compiler such as GCC or Clang
 
-For syntax examples, see `example.bas`.
+For syntax examples, see `example.bas` and `tests.bas`.
 
 To build weebasic:
 
 ```
 ./make.sh
+```
+
+To test that weebasic is running correctly:
+
+```
+./weebasic tests.bas
 ```
 
 To execute programs, run:
