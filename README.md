@@ -7,6 +7,7 @@ Design:
 - The tokenizer is built directly into the parser
 - Stack-based bytecode interpreter
 - No operator precedence for simplicity
+- No garbage allocator (just use malloc)
 
 ## Interview Format
 
