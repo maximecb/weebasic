@@ -2,15 +2,17 @@
 assert 1
 #assert 0
 
-# Basic arithmetic
-assert 1 == 1
-assert 1 < 2
-assert 1 + 2
-
 # Local variables
 let x = 1
 assert x
 assert x == 1
+
+# Basic arithmetic
+assert 1 == 1
+assert 1 < 2
+assert 1 + 2
+let x2 = 5 - 3
+assert x2 == 2
 
 # If statements
 if 0 then assert 0

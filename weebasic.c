@@ -38,16 +38,17 @@ typedef enum
     OP_SUB,
     OP_READINT,
     OP_PRINT
+
 } opcode_t;
 
 // Immutable, heap-allocated string object
 typedef struct
 {
     // String length, excluding null-terminator
-    const size_t len;
+    size_t len;
 
     // String data
-    const char* data;
+    char* data;
 
 } string_t;
 
