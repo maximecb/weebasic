@@ -32,6 +32,7 @@ allowed to use Google if you need to.
 
 Requirements:
 - C compiler such as GCC or Clang
+- No other dependencies
 
 Clone this repository:
 ```
