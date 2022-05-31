@@ -31,7 +31,7 @@ allowed to use Google if you need to.
 ## Installation
 
 Requirements:
-- C compiler such as GCC or Clang
+- The rust compiler (rustc)
 - No other dependencies
 
 Clone this repository:
@@ -43,7 +43,7 @@ To build weebasic:
 
 ```
 cd weebasic
-./make.sh
+rustc weebasic.rs
 ```
 
 To test that weebasic is working correctly:
@@ -62,4 +62,3 @@ To execute programs, run:
 ```
 ./weebasic example.bas
 ```
-

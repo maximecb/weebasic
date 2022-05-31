@@ -4,43 +4,39 @@
 *
 * Implementation of a parser and stack-based interpreter for a toy
 * programming language. This language was built by Maxime Chevalier-Boisvert
-* in 2021 as a study or interview, and is released under the unlicense.
+* in 2021-2022 for study or interview purposes, and is released under the
+* unlicense.
 *
 ****************************************************************************/
 
-#include "stdbool.h"
-#include "stdint.h"
-#include "stdlib.h"
-#include "stdio.h"
-#include "string.h"
-#include "ctype.h"
-#include "assert.h"
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+#![allow(dead_code)]
+#![allow(unused_mut)]
 
-// 64K instructions should be enough for anybody
-#define MAX_INSTRS 65536
-#define MAX_IDENT_LEN 64
-#define MAX_LOCALS 128
-#define MAX_STACK 32
+use std::env;
+use std::fs;
+use std::collections::HashMap;
 
-// Kinds of instructions we support
-typedef enum
+// Kinds of instructions (opcodes) we support
+enum Op
 {
-    OP_EXIT = 0,
-    OP_ERROR,
-    OP_PUSH,
-    OP_GETLOCAL,
-    OP_SETLOCAL,
-    OP_EQ,
-    OP_LT,
-    OP_IF,
-    OP_IFNOT,
-    OP_ADD,
-    OP_SUB,
-    OP_READINT,
-    OP_PRINT
+    Exit,
+    Error,
+    Push,
+    GetLocal,
+    SetLocal,
+    Equal,
+    LessThan,
+    If,
+    IfNot,
+    Add,
+    Sub,
+    ReadInt,
+    Print
+}
 
-} opcode_t;
-
+/*
 // Immutable, heap-allocated string object
 typedef struct
 {
@@ -59,15 +55,48 @@ typedef union
     string_t* str;
 
 } value_t;
+*/
 
 // Format of the instructions we implement
-typedef struct
+struct Insn
 {
-    opcode_t op;
-    value_t imm;
+    op: Op,
 
-} instr_t;
+    //value_t imm;
 
+}
+
+
+struct Program
+{
+    insns: Vec<Insn>,
+
+    num_locals: usize,
+
+    local_idxs: HashMap<String, usize>,
+}
+
+impl Program
+{
+    fn new() -> Self
+    {
+        Program {
+            insns: Vec::default(),
+            num_locals: 0,
+            local_idxs: HashMap::default(),
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+/*
 // Local variable declaration
 typedef struct LocalVar
 {
@@ -97,67 +126,125 @@ int64_t untag(value_t val)
     assert (is_int(val));
     return val.int_val >> 1;
 }
+*/
 
-// Consume whitespace chars in the input
-void eat_ws(char** pstr)
+
+
+
+
+
+
+
+struct Input
 {
-    while (true)
-    {
-        char ch = **pstr;
+    /// Characters of the input string
+    chars: Vec<char>,
 
-        switch (ch)
-        {
-            // Keep reading as long as we see whitespace
-            case ' ':
-            case '\t':
-            case '\r':
-            case '\n':
-            break;
-
-            // Not whitespace, stop
-            default:
-            return;
-        }
-
-        // Move to the next character
-        (*pstr)++;
-    }
+    /// Current position in the input
+    pos: usize,
 }
 
-// Consume single-line comments
-void eat_comment(char** pstr)
+impl Input
 {
-    while (true)
+    fn new(input_str: String) -> Self
     {
-        char ch = **pstr;
+        Input {
+            chars: input_str.chars().collect(),
+            pos: 0,
+        }
+    }
 
-        if (ch == '\n')
+    // Peek at the current input character
+    fn peek_char(&self) -> char
+    {
+        self.chars[self.pos]
+    }
+
+    // Consume whitespace chars in the input
+    fn eat_ws(&mut self)
+    {
+        loop
         {
+            let ch = self.peek_char();
+
+            match ch
+            {
+                // Keep reading as long as we see whitespace
+                ' ' | '\t' | '\r' | '\n' => {},
+
+                // Not whitespace, stop
+                _ => return,
+            }
+
             // Move to the next character
-            (*pstr)++;
-            break;
+            self.pos += 1;
         }
-
-        if (ch == '\0')
-        {
-            break;
-        }
-
-        // Move to the next character
-        (*pstr)++;
     }
+
+    // Consume single-line comments
+    fn eat_comment(&mut self)
+    {
+        loop
+        {
+            let ch = self.peek_char();
+
+            match ch
+            {
+                '\n' => {
+                    // Move to the next character
+                    self.pos += 1;
+                    break;
+                },
+
+                '\0' => {
+                    break;
+                },
+
+                _ => {
+                    self.pos += 1;
+                }
+            }
+        }
+    }
+
+
+
+
+
+
+
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
 // Match a token in the input
 bool match_token(char** pstr, const char* token)
 {
-    eat_ws(pstr);
+    input.eat_ws()
 
     size_t len_tok = strlen(token);
     if (strncmp(*pstr, token, len_tok) == 0)
     {
         *pstr += len_tok;
-        eat_ws(pstr);
+        input.eat_ws()
         return true;
     }
 
@@ -181,7 +268,7 @@ void parse_ident(char** pstr, char* ident_out)
 
     while (true)
     {
-        char ch = **pstr;
+        let ch = input.peek_char()
 
         if (ident_len >= MAX_IDENT_LEN - 1)
         {
@@ -219,7 +306,7 @@ int64_t parse_int(char** pstr)
 
     while (true)
     {
-        char ch = **pstr;
+        let ch = input.peek_char()
 
         if (!isdigit(ch))
             break;
@@ -256,7 +343,7 @@ local_t* find_local(local_t* local_vars, const char* ident)
 // Parse an atomic expression
 void parse_atom(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
 {
-    char ch = **pstr;
+    let ch = input.peek_char()
 
     // Read an integer from the console
     if (match_token(pstr, "read_int"))
@@ -303,9 +390,9 @@ void parse_expr(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
     // Parse a first expression
     parse_atom(pstr, insns, insn_idx, locals);
 
-    eat_ws(pstr);
+    input.eat_ws()
 
-    char ch = **pstr;
+    let ch = input.peek_char()
 
     if (match_token(pstr, "+"))
     {
@@ -347,17 +434,21 @@ void parse_expr(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
         return;
     }
 }
+*/
 
 // Parse a statement
-void parse_stmt(char** pstr, instr_t* insns, size_t* insn_idx, local_t** plocals)
+fn parse_stmt(input: &mut Input, prog: &mut Program)
 {
     // Consume whitespace
-    eat_ws(pstr);
+    input.eat_ws();
 
+
+
+    /*
     // Single-line comments
     if (match_token(pstr, "#"))
     {
-        eat_comment(pstr);
+        input.eat_comment();
         return;
     }
 
@@ -471,63 +562,60 @@ void parse_stmt(char** pstr, instr_t* insns, size_t* insn_idx, local_t** plocals
 
     fprintf(stderr, "invalid statement: \"%s [...]\"\n", *pstr);
     exit(-1);
+    */
 }
 
+
+
+
+
+
+
+
+
 // Parse a source file into a sequence of instructions
-instr_t* parse_file(const char* file_name)
+fn parse_file(file_name: &str) -> Program
 {
-    FILE* file = fopen(file_name, "r");
+    let input_str = fs::read_to_string(file_name)
+        .expect("couldn't read input source file");
 
-    if (!file)
-    {
-        fprintf(stderr, "failed to open source file \"%s\"\n", file_name);
-        exit(-1);
-    }
+    // Input to be parsed
+    let mut input = Input::new(input_str);
 
-    // Read the entire file into a string buffer
-    fseek(file, 0, SEEK_END);
-    long fsize = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    char* input_str = malloc(fsize + 1);
-    fread(input_str, 1, fsize, file);
-    input_str[fsize] = 0;
-    fclose(file);
-
-    // We will use a doubly-indirected pointer for parsing
-    char* current_ch = input_str;
-    char** pstr = &current_ch;
-
-    // Instruction array
-    instr_t* insns = malloc(sizeof(instr_t) * MAX_INSTRS);
-    size_t insn_idx = 0;
-
-    // Table of local variables
-    local_t* local_vars = NULL;
+    // Program being compiled
+    let mut program: Program = Program::new();
 
     // Until we reach the end of the input
-    while (true)
+    loop
     {
         // End of input
-        if (*current_ch == '\0')
-        {
+        if input.peek_char() == '\0' {
             break;
         }
 
-        parse_stmt(pstr, insns, &insn_idx, &local_vars);
+        parse_stmt(&mut input, &mut program);
     }
 
-    free(input_str);
-
-    return insns;
+    return program;
 }
 
+
+
+
+
+/*
 // Stack manipulation primitives
 #define PUSH(v) ( stack[stack_size] = v, stack_size++ )
 #define POP() ( stack_size--, stack[stack_size] )
+*/
 
 // Evaluate/run a program
-void eval(const instr_t* insns)
+fn eval(prog: Program)
 {
+
+
+
+    /*
     // Local variables
     value_t vars[MAX_LOCALS];
 
@@ -651,15 +739,19 @@ void eval(const instr_t* insns)
             exit(-1);
         }
     }
+    */
+
+
+
 }
 
-int main(int argc, char** argv)
+fn main()
 {
-    if (argc == 2)
-    {
-        instr_t* insns = parse_file(argv[1]);
-        eval(insns);
-    }
+    let args: Vec<String> = env::args().collect();
+    println!("{:?}", args);
 
-    return 0;
+    if args.len() == 2 {
+        let prog = parse_file(&args[1]);
+        eval(prog);
+    }
 }
