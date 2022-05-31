@@ -207,6 +207,26 @@ impl Input
         }
     }
 
+    // Check if the input starts with a given token
+    fn match_token(&mut self, token: &str) -> bool
+    {
+        self.eat_ws();
+
+        let token_chars: Vec<char> = token.chars().collect();
+        let num_chars = token_chars.len();
+
+
+        if self.chars[self.pos..(self.pos + num_chars)] == token_chars {
+            self.pos += num_chars;
+            self.eat_ws();
+            return true;
+        }
+
+        return false;
+    }
+
+
+
 
 
 
@@ -235,26 +255,10 @@ impl Input
 
 
 /*
-// Match a token in the input
-bool match_token(char** pstr, const char* token)
-{
-    input.eat_ws()
-
-    size_t len_tok = strlen(token);
-    if (strncmp(*pstr, token, len_tok) == 0)
-    {
-        *pstr += len_tok;
-        input.eat_ws()
-        return true;
-    }
-
-    return false;
-}
-
 // Fail to parse if a given token is not there
 void expect_token(char** pstr, const char* token)
 {
-    if (!match_token(pstr, token))
+    if (!input.match_token(token))
     {
         fprintf(stderr, "expected token \"%s\"\n", token);
         exit(-1);
@@ -346,7 +350,7 @@ void parse_atom(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
     let ch = input.peek_char()
 
     // Read an integer from the console
-    if (match_token(pstr, "read_int"))
+    if (input.match_token("read_int"))
     {
         APPEND_INSN(OP_READINT);
         return;
@@ -394,7 +398,7 @@ void parse_expr(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
 
     let ch = input.peek_char()
 
-    if (match_token(pstr, "+"))
+    if (input.match_token("+"))
     {
         // Parse the RHS expression
         parse_atom(pstr, insns, insn_idx, locals);
@@ -404,7 +408,7 @@ void parse_expr(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
         return;
     }
 
-    if (match_token(pstr, "-"))
+    if (input.match_token("-"))
     {
         // Parse the RHS expression
         parse_atom(pstr, insns, insn_idx, locals);
@@ -414,7 +418,7 @@ void parse_expr(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
         return;
     }
 
-    if (match_token(pstr, "=="))
+    if (input.match_token("=="))
     {
         // Parse the RHS expression
         parse_atom(pstr, insns, insn_idx, locals);
@@ -424,7 +428,7 @@ void parse_expr(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
         return;
     }
 
-    if (match_token(pstr, "<"))
+    if (input.match_token("<"))
     {
         // Parse the RHS expression
         parse_atom(pstr, insns, insn_idx, locals);
@@ -442,18 +446,18 @@ fn parse_stmt(input: &mut Input, prog: &mut Program)
     // Consume whitespace
     input.eat_ws();
 
-
-
-    /*
     // Single-line comments
-    if (match_token(pstr, "#"))
-    {
+    if input.match_token("#") {
         input.eat_comment();
         return;
     }
 
+
+
+
+    /*
     // Local variable declaration
-    if (match_token(pstr, "let"))
+    if (input.match_token("let"))
     {
         // Parse the variable name
         char ident[MAX_IDENT_LEN];
@@ -485,7 +489,7 @@ fn parse_stmt(input: &mut Input, prog: &mut Program)
         return;
     }
 
-    if (match_token(pstr, "if"))
+    if (input.match_token("if"))
     {
         // Parse the test expression
         parse_expr(pstr, insns, insn_idx, *plocals);
@@ -506,11 +510,11 @@ fn parse_stmt(input: &mut Input, prog: &mut Program)
     }
 
     // Sequencing of statements
-    if (match_token(pstr, "begin"))
+    if (input.match_token("begin"))
     {
         while (true)
         {
-            if (match_token(pstr, "end"))
+            if (input.match_token("end"))
             {
                 break;
             }
@@ -522,7 +526,7 @@ fn parse_stmt(input: &mut Input, prog: &mut Program)
     }
 
     // Print to stdout
-    if (match_token(pstr, "print"))
+    if (input.match_token("print"))
     {
         parse_expr(pstr, insns, insn_idx, *plocals);
         APPEND_INSN(OP_PRINT);
@@ -530,7 +534,7 @@ fn parse_stmt(input: &mut Input, prog: &mut Program)
     }
 
     // Print to stdout
-    if (match_token(pstr, "assert"))
+    if (input.match_token("assert"))
     {
         // Parse the condition
         parse_expr(pstr, insns, insn_idx, *plocals);
