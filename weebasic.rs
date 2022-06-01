@@ -9,10 +9,7 @@
 *
 ****************************************************************************/
 
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 #![allow(dead_code)]
-#![allow(unused_mut)]
 
 use std::io;
 use std::io::Write;
@@ -354,10 +351,6 @@ fn parse_expr(input: &mut Input, prog: &mut Program)
     // Parse a first expression
     parse_atom(input, prog);
 
-    input.eat_ws();
-
-    let ch = input.peek_char();
-
     if input.match_token("+") {
         // Parse the RHS expression
         parse_atom(input, prog);
@@ -649,6 +642,7 @@ impl VM
                     self.push(Value::IntVal(n));
                 }
 
+                // Print a value to stdout (followed by a newline)
                 Op::Print => {
                     let int_val = self.pop().unwrap_int();
                     println!("print: {}\n", int_val);
