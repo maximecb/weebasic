@@ -546,8 +546,8 @@ impl VM
 
         self.pc = 0;
 
-        loop
-        {
+        while self.pc < prog.insns.len() {
+            // Read the current instruction
             let insn = &prog.insns[self.pc];
 
             match insn.op
