@@ -154,13 +154,13 @@ impl Input
         }
     }
 
-    // Peek at the current input character
+    /// Peek at the current input character
     fn peek_char(&self) -> char
     {
         self.chars[self.pos]
     }
 
-    // Consume whitespace chars in the input
+    /// Consume whitespace chars in the input
     fn eat_ws(&mut self)
     {
         loop
@@ -181,7 +181,7 @@ impl Input
         }
     }
 
-    // Consume single-line comments
+    /// Consume single-line comments
     fn eat_comment(&mut self)
     {
         loop
@@ -207,7 +207,7 @@ impl Input
         }
     }
 
-    // Check if the input starts with a given token
+    /// Check if the input starts with a given token
     fn match_token(&mut self, token: &str) -> bool
     {
         self.eat_ws();
@@ -225,6 +225,64 @@ impl Input
         return false;
     }
 
+    /// Fail to parse if a given token is not there
+    fn expect_token(&mut self, token: &str)
+    {
+        if !self.match_token(token) {
+            panic!("expected token \"{}\"", token);
+        }
+    }
+
+    /// Parse an identifier at the current position
+    fn parse_ident(&mut self) -> String
+    {
+        let mut ident_str = String::from("");
+
+        loop
+        {
+            let ch = self.peek_char();
+
+            if !ch.is_alphanumeric() && ch != '_' {
+                break;
+            }
+
+            // Store this character
+            ident_str.push(ch);
+
+            // Move to the next character
+            self.pos += 1;
+        }
+
+        if ident_str.len() == 0 {
+            panic!("expected identifier\n");
+        }
+
+        return ident_str;
+    }
+
+    /// Parse a positive decimal integer constant
+    fn parse_int(&mut self) -> i64
+    {
+        let mut num: i64 = 0;
+
+        loop
+        {
+            let ch = self.peek_char();
+
+            if !ch.is_digit(10) {
+                break;
+            }
+
+            // Store this digit
+            let digit: i64 = (ch as i64) - ('0' as i64);
+            num = 10 * num + digit;
+
+            // Move to the next character
+            self.pos += 1;
+        }
+
+        return num;
+    }
 
 
 
@@ -255,76 +313,6 @@ impl Input
 
 
 /*
-// Fail to parse if a given token is not there
-void expect_token(char** pstr, const char* token)
-{
-    if (!input.match_token(token))
-    {
-        fprintf(stderr, "expected token \"%s\"\n", token);
-        exit(-1);
-    }
-}
-
-// Parse an identifier
-void parse_ident(char** pstr, char* ident_out)
-{
-    size_t ident_len = 0;
-
-    while (true)
-    {
-        let ch = input.peek_char()
-
-        if (ident_len >= MAX_IDENT_LEN - 1)
-        {
-            fprintf(stderr, "identifier too long\n");
-            exit(-1);
-        }
-
-        if (!isalnum(ch) && ch != '_')
-        {
-            break;
-        }
-
-        // Store this character
-        ident_out[ident_len] = ch;
-        ident_len++;
-
-        // Move to the next character
-        (*pstr)++;
-    }
-
-    if (ident_len == 0)
-    {
-        fprintf(stderr, "expected identifier\n");
-        exit(-1);
-    }
-
-    assert(ident_len <= MAX_IDENT_LEN - 1);
-    ident_out[ident_len] = '\0';
-}
-
-// Parse a positive integer constant
-int64_t parse_int(char** pstr)
-{
-    int64_t num = 0;
-
-    while (true)
-    {
-        let ch = input.peek_char()
-
-        if (!isdigit(ch))
-            break;
-
-        // Store this digit
-        int64_t digit = ch - '0';
-        num = 10 * num + digit;
-
-        // Move to the next character
-        (*pstr)++;
-    }
-
-    return num;
-}
 
 // Try to find a local variable declaration
 local_t* find_local(local_t* local_vars, const char* ident)
@@ -452,13 +440,9 @@ fn parse_stmt(input: &mut Input, prog: &mut Program)
         return;
     }
 
-
-
-
-    /*
     // Local variable declaration
-    if (input.match_token("let"))
-    {
+    if input.match_token("let") {
+        /*
         // Parse the variable name
         char ident[MAX_IDENT_LEN];
         parse_ident(pstr, ident);
@@ -487,8 +471,10 @@ fn parse_stmt(input: &mut Input, prog: &mut Program)
         APPEND_INSN_IMM(OP_SETLOCAL, new_local->idx);
 
         return;
+        */
     }
 
+    /*
     if (input.match_token("if"))
     {
         // Parse the test expression
