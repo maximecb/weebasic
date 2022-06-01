@@ -28,13 +28,23 @@ enum Op
     SetLocal,
     Equal,
     LessThan,
-    If,
+    IfTrue,
     IfNot,
     Add,
     Sub,
     ReadInt,
     Print
 }
+
+enum Value
+{
+    None,
+    Idx(usize),
+    IntVal(i64),
+    Str(String),
+}
+
+
 
 /*
 // Immutable, heap-allocated string object
@@ -55,61 +65,6 @@ typedef union
     string_t* str;
 
 } value_t;
-*/
-
-// Format of the instructions we implement
-struct Insn
-{
-    op: Op,
-
-    //value_t imm;
-
-}
-
-
-struct Program
-{
-    insns: Vec<Insn>,
-
-    num_locals: usize,
-
-    local_idxs: HashMap<String, usize>,
-}
-
-impl Program
-{
-    fn new() -> Self
-    {
-        Program {
-            insns: Vec::default(),
-            num_locals: 0,
-            local_idxs: HashMap::default(),
-        }
-    }
-}
-
-
-
-
-
-
-
-
-
-/*
-// Local variable declaration
-typedef struct LocalVar
-{
-    // Name of the variable
-    char ident[MAX_IDENT_LEN];
-
-    // Index of the local variable
-    size_t idx;
-
-    // Next variable in the list
-    struct LocalVar* next;
-
-} local_t;
 
 bool is_int(value_t val)
 {
@@ -134,7 +89,84 @@ int64_t untag(value_t val)
 
 
 
+// Format of the instructions we implement
+struct Insn
+{
+    op: Op,
+    imm: Value,
+}
 
+struct Program
+{
+    insns: Vec<Insn>,
+
+    num_locals: usize,
+
+    /// Mapping of identifiers to local variable indices
+    local_idxs: HashMap<String, usize>,
+}
+
+impl Program
+{
+    fn new() -> Self
+    {
+        Program {
+            insns: Vec::default(),
+            num_locals: 0,
+            local_idxs: HashMap::default(),
+        }
+    }
+
+    /// Append an instruction with no argument
+    fn append_insn(&mut self, op: Op)
+    {
+        self.insns.push(Insn {
+            op: op,
+            imm: Value::None
+        });
+    }
+
+    /// Append an instruction with an immediate argument
+    fn append_insn_imm(&mut self, op: Op, imm: Value)
+    {
+        self.insns.push(Insn {
+            op: op,
+            imm: imm
+        });
+    }
+
+    /// Try to find the index for local variable declaration
+    fn find_local(&self, ident: &str) -> Option<usize>
+    {
+        match self.local_idxs.get(ident) {
+            Some(idx) => Some(*idx),
+            None => None,
+        }
+    }
+
+    /// Declare a new local variable
+    fn declare_local(&mut self, ident: &str) -> usize
+    {
+        assert!(self.find_local(ident).is_none());
+        let local_idx = self.local_idxs.len();
+        self.local_idxs.insert(ident.to_owned(), local_idx);
+        return local_idx;
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+/// Stream of input characters to be parsed
 struct Input
 {
     /// Characters of the input string
@@ -283,150 +315,98 @@ impl Input
 
         return num;
     }
-
-
-
-
-
-
-
-
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
-
-// Try to find a local variable declaration
-local_t* find_local(local_t* local_vars, const char* ident)
-{
-    for (local_t* var = local_vars; var != NULL; var = var->next)
-    {
-        if (strcmp(var->ident, ident) == 0)
-        {
-            return var;
-        }
-    }
-
-    return NULL;
-}
-
-// Macros to append an instruction to the program
-#define APPEND_INSN(op_type) ( insns[(*insn_idx)++] = (instr_t){ op_type }, &insns[(*insn_idx)-1] )
-#define APPEND_INSN_IMM(op_type, imm) ( insns[(*insn_idx)++] = (instr_t){ op_type, imm }, &insns[(*insn_idx)-1] )
 
 // Parse an atomic expression
-void parse_atom(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
+fn parse_atom(input: &mut Input, prog: &mut Program)
 {
-    let ch = input.peek_char()
+    let ch = input.peek_char();
 
     // Read an integer from the console
-    if (input.match_token("read_int"))
-    {
-        APPEND_INSN(OP_READINT);
+    if input.match_token("read_int") {
+        prog.append_insn(Op::ReadInt);
         return;
     }
 
     // Integer constant
-    if (isdigit(ch))
-    {
-        int64_t num = parse_int(pstr);
-        APPEND_INSN_IMM(OP_PUSH, num);
+    if ch.is_digit(10) {
+        let num = input.parse_int();
+        prog.append_insn_imm(Op::Push, Value::IntVal(num));
         return;
     }
 
     // Reference to a variable
-    if (isalpha(ch) || ch == '_')
-    {
+    if ch.is_alphabetic() || ch == '_' {
         // Parse the variable name
-        char ident[MAX_IDENT_LEN];
-        parse_ident(pstr, ident);
+        let ident_str = input.parse_ident();
 
         // Try to find the declaration
-        local_t* local = find_local(locals, ident);
+        let local_idx = prog.find_local(&ident_str);
 
-        if (!local)
-        {
-            fprintf(stderr, "reference to undeclared variable \"%s\"\n", ident);
-            exit(-1);
+        if local_idx.is_none() {
+            panic!("reference to undeclared variable \"{}\"\n", ident_str);
         }
 
-        APPEND_INSN_IMM(OP_GETLOCAL, local->idx);
+        prog.append_insn_imm(Op::GetLocal, Value::Idx(local_idx.unwrap()));
         return;
     }
 
-    fprintf(stderr, "invalid expression");
-    exit(-1);
+    panic!("invalid expression");
 }
 
 // Parse an expression
-void parse_expr(char** pstr, instr_t* insns, size_t* insn_idx, local_t* locals)
+fn parse_expr(input: &mut Input, prog: &mut Program)
 {
     // Parse a first expression
-    parse_atom(pstr, insns, insn_idx, locals);
+    parse_atom(input, prog);
 
-    input.eat_ws()
+    input.eat_ws();
 
-    let ch = input.peek_char()
+    let ch = input.peek_char();
 
-    if (input.match_token("+"))
-    {
+    if input.match_token("+") {
         // Parse the RHS expression
-        parse_atom(pstr, insns, insn_idx, locals);
+        parse_atom(input, prog);
 
         // Add the result
-        APPEND_INSN(OP_ADD);
+        prog.append_insn(Op::Add);
         return;
     }
 
-    if (input.match_token("-"))
-    {
+    if input.match_token("-") {
         // Parse the RHS expression
-        parse_atom(pstr, insns, insn_idx, locals);
+        parse_atom(input, prog);
 
         // Subtract the result
-        APPEND_INSN(OP_SUB);
+        prog.append_insn(Op::Sub);
         return;
     }
 
-    if (input.match_token("=="))
-    {
+    if input.match_token("==") {
         // Parse the RHS expression
-        parse_atom(pstr, insns, insn_idx, locals);
+        parse_atom(input, prog);
 
         // Compare the arguments
-        APPEND_INSN(OP_EQ);
+        prog.append_insn(Op::Equal);
         return;
     }
 
-    if (input.match_token("<"))
-    {
+    if input.match_token("<") {
         // Parse the RHS expression
-        parse_atom(pstr, insns, insn_idx, locals);
+        parse_atom(input, prog);
 
         // Compare the arguments
-        APPEND_INSN(OP_LT);
+        prog.append_insn(Op::LessThan);
         return;
     }
 }
-*/
+
+
+
+
+
+
+
 
 // Parse a statement
 fn parse_stmt(input: &mut Input, prog: &mut Program)
@@ -442,98 +422,93 @@ fn parse_stmt(input: &mut Input, prog: &mut Program)
 
     // Local variable declaration
     if input.match_token("let") {
-        /*
         // Parse the variable name
-        char ident[MAX_IDENT_LEN];
-        parse_ident(pstr, ident);
+        let ident_str = input.parse_ident();
 
-        expect_token(pstr, "=");
+        input.expect_token("=");
 
         // Parse the expression we are assigning
-        parse_expr(pstr, insns, insn_idx, *plocals);
+        parse_expr(input, prog);
 
         // Make sure this isn't a redeclaration
-        local_t* first_local = *plocals;
-        if (find_local(first_local, ident))
-        {
-            fprintf(stderr, "local variable \"%s\" already declared\n", ident);
-            exit(-1);
+        let local_idx = prog.find_local(&ident_str);
+
+        if local_idx.is_some() {
+            panic!("local variable \"{}\" already declared\n", ident_str);
         }
 
         // Create a new local variable
-        local_t* new_local = malloc(sizeof(local_t));
-        strcpy(new_local->ident, ident);
-        new_local->idx = first_local? (first_local->idx + 1):0;
-        new_local->next = first_local;
-        *plocals = new_local;
+        let local_idx = prog.declare_local(&ident_str);
 
         // Set the local to the expression's value
-        APPEND_INSN_IMM(OP_SETLOCAL, new_local->idx);
+        prog.append_insn_imm(Op::SetLocal, Value::Idx(local_idx));
 
         return;
-        */
     }
 
-    /*
-    if (input.match_token("if"))
-    {
+    if input.match_token("if") {
         // Parse the test expression
-        parse_expr(pstr, insns, insn_idx, *plocals);
+        parse_expr(input, prog);
 
-        expect_token(pstr, "then");
+        input.expect_token("then");
 
         // If the result is false, jump past the if clause
-        instr_t* ifnot_insn = APPEND_INSN_IMM(OP_IFNOT, 0);
+        //instr_t* ifnot_insn = APPEND_INSN_IMM(OP_IFNOT, 0);
+        let ifnot_insn_idx = prog.insns.len();
+        prog.append_insn(Op::IfNot);
 
         // Parse the body of the if statement
-        parse_stmt(pstr, insns, insn_idx, plocals);
+        parse_stmt(input, prog);
 
         // If the condition is false, we jump after the body of the if
-        instr_t* pfalse = &insns[*insn_idx];
-        ifnot_insn->imm.int_val = (pfalse - ifnot_insn) - 1;
+        let jumpto_idx = prog.insns.len();
+        let jump_offset = (jumpto_idx as i64) - (ifnot_insn_idx as i64) - 1;
+        prog.insns[ifnot_insn_idx].imm = Value::IntVal(jump_offset);
 
         return;
     }
 
     // Sequencing of statements
-    if (input.match_token("begin"))
-    {
-        while (true)
+    if input.match_token("begin") {
+        loop
         {
-            if (input.match_token("end"))
-            {
+            if input.match_token("end") {
                 break;
             }
 
-            parse_stmt(pstr, insns, insn_idx, plocals);
+            parse_stmt(input, prog);
         }
 
         return;
     }
 
     // Print to stdout
-    if (input.match_token("print"))
-    {
-        parse_expr(pstr, insns, insn_idx, *plocals);
-        APPEND_INSN(OP_PRINT);
+    if input.match_token("print") {
+        parse_expr(input, prog);
+        prog.append_insn(Op::Print);
         return;
     }
 
-    // Print to stdout
-    if (input.match_token("assert"))
-    {
+    // Assert that an expression evaluates to true
+    if input.match_token("assert") {
         // Parse the condition
-        parse_expr(pstr, insns, insn_idx, *plocals);
+        parse_expr(input, prog);
 
         // If the result is true, jump over the error instruction
-        APPEND_INSN_IMM(OP_IF, 1);
+        prog.append_insn_imm(Op::IfTrue, Value::IntVal(1));
 
         // Exit with an error
-        APPEND_INSN(OP_ERROR);
+        prog.append_insn(Op::Error);
 
         return;
     }
 
+
+
+
+
+
+    /*
     // Cap the string length for printing
     if (strlen(*pstr) > 10)
     {
@@ -549,15 +524,11 @@ fn parse_stmt(input: &mut Input, prog: &mut Program)
         if (ch == '\0')
             break;
     }
-
-    fprintf(stderr, "invalid statement: \"%s [...]\"\n", *pstr);
-    exit(-1);
     */
+
+    panic!("invalid statement");
+    //panic!("invalid statement: \"%s [...]\"\n", *pstr);
 }
-
-
-
-
 
 
 
@@ -588,6 +559,9 @@ fn parse_file(file_name: &str) -> Program
 
     return program;
 }
+
+
+
 
 
 
