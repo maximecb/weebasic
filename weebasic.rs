@@ -44,8 +44,6 @@ enum Value
     Str(String),
 }
 
-
-
 /*
 // Immutable, heap-allocated string object
 typedef struct
@@ -82,12 +80,6 @@ int64_t untag(value_t val)
     return val.int_val >> 1;
 }
 */
-
-
-
-
-
-
 
 // Format of the instructions we implement
 struct Insn
@@ -154,18 +146,6 @@ impl Program
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
 /// Stream of input characters to be parsed
 struct Input
 {
@@ -189,7 +169,22 @@ impl Input
     /// Peek at the current input character
     fn peek_char(&self) -> char
     {
+        if self.pos >= self.chars.len() {
+            return '\0';
+        }
+
         self.chars[self.pos]
+    }
+
+    /// Consume one character of the input
+    fn eat_char(&mut self) -> char {
+        let ch = self.peek_char();
+
+        if ch != '\0' {
+            self.pos += 1;
+        }
+
+        return ch
     }
 
     /// Consume whitespace chars in the input
@@ -209,7 +204,7 @@ impl Input
             }
 
             // Move to the next character
-            self.pos += 1;
+            self.eat_char();
         }
     }
 
@@ -224,7 +219,7 @@ impl Input
             {
                 '\n' => {
                     // Move to the next character
-                    self.pos += 1;
+                    self.eat_char();
                     break;
                 },
 
@@ -233,7 +228,7 @@ impl Input
                 },
 
                 _ => {
-                    self.pos += 1;
+                    self.eat_char();
                 }
             }
         }
@@ -247,6 +242,9 @@ impl Input
         let token_chars: Vec<char> = token.chars().collect();
         let num_chars = token_chars.len();
 
+        if self.pos + num_chars > self.chars.len() {
+            return false;
+        }
 
         if self.chars[self.pos..(self.pos + num_chars)] == token_chars {
             self.pos += num_chars;
@@ -282,7 +280,7 @@ impl Input
             ident_str.push(ch);
 
             // Move to the next character
-            self.pos += 1;
+            self.eat_char();
         }
 
         if ident_str.len() == 0 {
@@ -310,7 +308,7 @@ impl Input
             num = 10 * num + digit;
 
             // Move to the next character
-            self.pos += 1;
+            self.eat_char();
         }
 
         return num;
@@ -400,13 +398,6 @@ fn parse_expr(input: &mut Input, prog: &mut Program)
         return;
     }
 }
-
-
-
-
-
-
-
 
 // Parse a statement
 fn parse_stmt(input: &mut Input, prog: &mut Program)
@@ -503,11 +494,6 @@ fn parse_stmt(input: &mut Input, prog: &mut Program)
         return;
     }
 
-
-
-
-
-
     /*
     // Cap the string length for printing
     if (strlen(*pstr) > 10)
@@ -529,10 +515,6 @@ fn parse_stmt(input: &mut Input, prog: &mut Program)
     panic!("invalid statement");
     //panic!("invalid statement: \"%s [...]\"\n", *pstr);
 }
-
-
-
-
 
 // Parse a source file into a sequence of instructions
 fn parse_file(file_name: &str) -> Program
