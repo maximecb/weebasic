@@ -1,6 +1,6 @@
 # weebasic
 
-Toy BASIC-like language and interpreter implemented in C for study or interview purposes. The interpreter is intentionally left incomplete so that new features can be implemented as coding exercises. This software is distributed under the Unlicense, meaning it is effectively public domain, though crediting the author is appreciated.
+Toy BASIC-like language and interpreter implemented in Rust for study or interview purposes. The interpreter is intentionally left incomplete so that new features can be implemented as coding exercises. This software is distributed under the Unlicense, meaning it is effectively public domain, though crediting the author is appreciated.
 
 Design:
 - Top-down recursive descent parser
@@ -17,16 +17,17 @@ I'm going to ask you to implement new features in `weebasic`. For example, I mig
 constructs or to add support for new data types in the language.
 
 The primary purpose is to evaluate your knowledge
-of C and systems programming, and to see if you understand how a simple parser and bytecode interpreter works.
+of Rust and systems programming, and to see if you understand how a simple parser and bytecode interpreter works.
 I'm also assessing your communication and problem-solving skills. You should try to roughly explain what you are doing
 as you do it.
 
-You'll be doing the coding, but I'm there to help you.
+You'll be doing the coding, but I'm here to help you.
 I'm a friendly interviewer and my goal is to help you succeed. The interview isn't designed to cause you stress.
 Your solution doesn't need to be
 perfect and you don't need to worry about performance. Typically, the simplest viable solution is the expected answer.
-You're allowed to ask as many clarifying questions as you want during the interview, and you're even
-allowed to use Google if you need to.
+You're allowed to ask as many clarifying questions as you want during the interview, and you're also
+allowed to use Google if you need to. It's very much expected that you might need to look up Rust documentation,
+for example.
 
 ## Installation
 
@@ -56,9 +57,16 @@ To test that weebasic is working correctly:
 
 For syntax examples, see `example.bas` and `tests.bas`.
 
-
 To execute programs, run:
 
 ```
 ./weebasic example.bas
+```
+
+## Debugging Tips
+
+To get a backtrace, you can set the `RUST_BACKTRACE` environment variable:
+
+```
+RUST_BACKTRACE=1 ./weebasic example.bas
 ```
