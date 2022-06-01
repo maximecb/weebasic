@@ -15,6 +15,7 @@ The first thing you should do is to clone this repository and create your own br
 I would then suggest browsing the code and the example source files to get familiar with them a little bit.
 I'm going to ask you to implement new features in `weebasic`. For example, I might ask you to implement new syntactic
 constructs or to add support for new data types in the language.
+You should try to [install rustc](https://www.rust-lang.org/tools/install) and compile weebasic before the interview if possible
 
 The primary purpose is to evaluate your knowledge
 of Rust and systems programming, and to see if you understand how a simple parser and bytecode interpreter works.
@@ -32,7 +33,7 @@ for example.
 ## Installation
 
 Requirements:
-- The rust compiler (rustc)
+- The [rust compiler](https://www.rust-lang.org/tools/install) (rustc)
 - No other dependencies
 
 Clone this repository:
