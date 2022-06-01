@@ -50,6 +50,13 @@ enum Value
 
 impl Value
 {
+    fn is_none(&self) -> bool {
+        match self {
+            Value::None => true,
+            _ => false,
+        }
+    }
+
     fn unwrap_idx(&self) -> usize {
         match self {
             Value::Idx(idx) => *idx,
@@ -190,7 +197,7 @@ impl Input
         }
     }
 
-    /// Consume single-line comments
+    /// Consume a single-line comment
     fn eat_comment(&mut self)
     {
         loop
@@ -331,7 +338,14 @@ fn parse_atom(input: &mut Input, prog: &mut Program)
         return;
     }
 
-    panic!("invalid expression");
+    // Parenthesized sub-expression
+    if input.match_token("(") {
+        parse_expr(input, prog);
+        input.expect_token(")");
+        return;
+    }
+
+    panic!("invalid atomic expression");
 }
 
 /// Parse an expression
@@ -571,9 +585,12 @@ impl VM
                 }
 
                 Op::GetLocal => {
-                    self.push(self.locals[insn.imm.unwrap_idx()].clone());
+                    let val = self.locals[insn.imm.unwrap_idx()].clone();
+                    assert!(!val.is_none(), "uninitialized local");
+                    self.push(val);
                 }
 
+                // Compare two values for equality
                 Op::Equal => {
                     let arg1 = self.pop().unwrap_int();
                     let arg0 = self.pop().unwrap_int();
@@ -588,6 +605,7 @@ impl VM
                     self.push(Value::IntVal(bool_val));
                 }
 
+                // Jump if true
                 Op::IfTrue => {
                     let test_val = self.pop().unwrap_int();
 
@@ -597,6 +615,7 @@ impl VM
                     }
                 }
 
+                // Jump if not true
                 Op::IfNot => {
                     let test_val = self.pop().unwrap_int();
 
@@ -649,6 +668,7 @@ impl VM
 
 fn main()
 {
+    // Get the command-line arguments
     let args: Vec<String> = env::args().collect();
     println!("{:?}", args);
 

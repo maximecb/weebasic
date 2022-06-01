@@ -14,6 +14,10 @@ assert 1 + 2
 let x2 = 5 - 3
 assert x2 == 2
 
+# Expressions can be nested using parentheses
+assert (1 + 1) == 2
+assert (1 + 2) == (2 + 1)
+
 # If statements
 if 0 then assert 0
 if 1 then assert 1
