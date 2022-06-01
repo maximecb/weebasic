@@ -14,11 +14,14 @@
 #![allow(dead_code)]
 #![allow(unused_mut)]
 
+use std::io;
+use std::io::Write;
 use std::env;
 use std::fs;
 use std::collections::HashMap;
 
 // Kinds of instructions (opcodes) we support
+#[derive(Debug)]
 enum Op
 {
     Exit,
@@ -36,6 +39,7 @@ enum Op
     Print
 }
 
+#[derive(Clone, Debug)]
 enum Value
 {
     None,
@@ -44,42 +48,22 @@ enum Value
     Str(String),
 }
 
-/*
-// Immutable, heap-allocated string object
-typedef struct
+impl Value
 {
-    // String length, excluding null-terminator
-    size_t len;
+    fn unwrap_idx(&self) -> usize {
+        match self {
+            Value::Idx(idx) => *idx,
+            _ => panic!("value is not an index")
+        }
+    }
 
-    // String data
-    char* data;
-
-} string_t;
-
-typedef union
-{
-    uint64_t idx;
-    int64_t int_val;
-    string_t* str;
-
-} value_t;
-
-bool is_int(value_t val)
-{
-    return val.int_val & 1;
+    fn unwrap_int(&self) -> i64 {
+        match self {
+            Value::IntVal(int_val) => *int_val,
+            _ => panic!("value is not an integer")
+        }
+    }
 }
-
-value_t tag(int64_t val)
-{
-    return (value_t)((val << 1) | 1);
-}
-
-int64_t untag(value_t val)
-{
-    assert (is_int(val));
-    return val.int_val >> 1;
-}
-*/
 
 // Format of the instructions we implement
 struct Insn
@@ -90,9 +74,8 @@ struct Insn
 
 struct Program
 {
+    /// List of instructions
     insns: Vec<Insn>,
-
-    num_locals: usize,
 
     /// Mapping of identifiers to local variable indices
     local_idxs: HashMap<String, usize>,
@@ -104,7 +87,6 @@ impl Program
     {
         Program {
             insns: Vec::default(),
-            num_locals: 0,
             local_idxs: HashMap::default(),
         }
     }
@@ -315,7 +297,7 @@ impl Input
     }
 }
 
-// Parse an atomic expression
+/// Parse an atomic expression
 fn parse_atom(input: &mut Input, prog: &mut Program)
 {
     let ch = input.peek_char();
@@ -352,7 +334,7 @@ fn parse_atom(input: &mut Input, prog: &mut Program)
     panic!("invalid expression");
 }
 
-// Parse an expression
+/// Parse an expression
 fn parse_expr(input: &mut Input, prog: &mut Program)
 {
     // Parse a first expression
@@ -399,7 +381,7 @@ fn parse_expr(input: &mut Input, prog: &mut Program)
     }
 }
 
-// Parse a statement
+/// Parse a statement
 fn parse_stmt(input: &mut Input, prog: &mut Program)
 {
     // Consume whitespace
@@ -494,29 +476,11 @@ fn parse_stmt(input: &mut Input, prog: &mut Program)
         return;
     }
 
-    /*
-    // Cap the string length for printing
-    if (strlen(*pstr) > 10)
-    {
-        (*pstr)[10] = '\0';
-    }
-
-    // Remove newlines from printout
-    for (int i = 0;; ++i)
-    {
-        char ch = (*pstr)[i];
-        if (ch == '\r' || ch == '\n')
-            (*pstr)[i] = ' ';
-        if (ch == '\0')
-            break;
-    }
-    */
-
+    // TODO: report more info about current position and next token
     panic!("invalid statement");
-    //panic!("invalid statement: \"%s [...]\"\n", *pstr);
 }
 
-// Parse a source file into a sequence of instructions
+/// Parse a source file into a sequence of instructions
 fn parse_file(file_name: &str) -> Program
 {
     let input_str = fs::read_to_string(file_name)
@@ -542,153 +506,145 @@ fn parse_file(file_name: &str) -> Program
     return program;
 }
 
-
-
-
-
-
-
-
-/*
-// Stack manipulation primitives
-#define PUSH(v) ( stack[stack_size] = v, stack_size++ )
-#define POP() ( stack_size--, stack[stack_size] )
-*/
-
-// Evaluate/run a program
-fn eval(prog: Program)
+/// Virtual machine / interpreter
+struct VM
 {
+    /// Local variables
+    locals: Vec<Value>,
 
+    /// Stack of temporary values
+    stack: Vec<Value>,
 
+    /// Program counter
+    pc: usize,
+}
 
-    /*
-    // Local variables
-    value_t vars[MAX_LOCALS];
-
-    // Stack of temporary values
-    value_t stack[MAX_STACK];
-    size_t stack_size = 0;
-
-    for (const instr_t* pc = insns; pc != NULL; ++pc)
-    {
-        //printf("stack_size=%zu\n", stack_size);
-
-        switch (pc->op)
-        {
-            // Exit the program
-            case OP_EXIT:
-            return;
-
-            case OP_ERROR:
-            fprintf(stderr, "Run-time error\n");
-            exit(-1);
-            return;
-
-            case OP_PUSH:
-            PUSH(pc->imm);
-            break;
-
-            case OP_SETLOCAL:
-            vars[pc->imm.idx] = POP();
-            break;
-
-            case OP_GETLOCAL:
-            PUSH(vars[pc->imm.idx]);
-            break;
-
-            case OP_EQ:
-            {
-                int64_t arg1 = POP().int_val;
-                int64_t arg0 = POP().int_val;
-                int64_t bool_val = (arg0 == arg1)? 1:0;
-                PUSH((value_t)bool_val);
-            }
-            break;
-
-            case OP_LT:
-            {
-                int64_t arg1 = POP().int_val;
-                int64_t arg0 = POP().int_val;
-                int64_t bool_val = (arg0 < arg1)? 1:0;
-                PUSH((value_t)bool_val);
-            }
-            break;
-
-            case OP_IF:
-            {
-                int64_t test_val = POP().int_val;
-
-                if (test_val != 0)
-                {
-                    int64_t jump_offset = pc->imm.int_val;
-                    pc += jump_offset;
-                }
-            }
-            break;
-
-            case OP_IFNOT:
-            {
-                int64_t test_val = POP().int_val;
-
-                if (test_val == 0)
-                {
-                    int64_t jump_offset = pc->imm.int_val;
-                    pc += jump_offset;
-                }
-            }
-            break;
-
-            case OP_ADD:
-            {
-                int64_t arg1 = POP().int_val;
-                int64_t arg0 = POP().int_val;
-                PUSH((value_t)(arg0 + arg1));
-            }
-            break;
-
-            case OP_SUB:
-            {
-                int64_t arg1 = POP().int_val;
-                int64_t arg0 = POP().int_val;
-                PUSH((value_t)(arg0 - arg1));
-            }
-            break;
-
-            case OP_READINT:
-            {
-                printf("Input an integer value:\n");
-                printf("> ");
-
-                int64_t int_val = 0;
-                while (true)
-                {
-                    char c = fgetc(stdin);
-                    if (c == EOF || !isdigit(c))
-                        break;
-                    int64_t digit = c - '0';
-                    int_val = 10 * int_val + digit;
-                }
-
-                PUSH((value_t)int_val);
-            }
-            break;
-
-            case OP_PRINT:
-            {
-                int64_t int_val = POP().int_val;
-                printf("print: %lld\n", (long long)int_val);
-            }
-            break;
-
-            default:
-            fprintf(stderr, "unknown bytecode instruction\n");
-            exit(-1);
+impl VM
+{
+    fn new() -> Self {
+        VM {
+            locals: Vec::default(),
+            stack: Vec::default(),
+            pc: 0,
         }
     }
-    */
 
+    fn push(&mut self, val: Value) {
+        self.stack.push(val);
+    }
 
+    fn pop(&mut self) -> Value {
+        self.stack.pop().unwrap()
+    }
 
+    // Evaluate/run a program
+    fn eval(&mut self, prog: Program)
+    {
+        let num_locals = prog.local_idxs.len();
+
+        self.locals.resize(num_locals, Value::None);
+
+        self.pc = 0;
+
+        loop
+        {
+            let insn = &prog.insns[self.pc];
+
+            match insn.op
+            {
+                // Exit the program
+                Op::Exit => {
+                    return;
+                }
+
+                // Abort execution
+                Op::Error => {
+                    panic!("Run-time error\n");
+                }
+
+                Op::Push => {
+                    self.push(insn.imm.clone());
+                }
+
+                Op::SetLocal => {
+                    self.locals[insn.imm.unwrap_idx()] = self.pop();
+                }
+
+                Op::GetLocal => {
+                    self.push(self.locals[insn.imm.unwrap_idx()].clone());
+                }
+
+                Op::Equal => {
+                    let arg1 = self.pop().unwrap_int();
+                    let arg0 = self.pop().unwrap_int();
+                    let bool_val = if arg0 == arg1 { 1 } else { 0 };
+                    self.push(Value::IntVal(bool_val));
+                }
+
+                Op::LessThan => {
+                    let arg1 = self.pop().unwrap_int();
+                    let arg0 = self.pop().unwrap_int();
+                    let bool_val = if arg0 < arg1 { 1 } else { 0 };
+                    self.push(Value::IntVal(bool_val));
+                }
+
+                Op::IfTrue => {
+                    let test_val = self.pop().unwrap_int();
+
+                    if test_val != 0 {
+                        let jump_offset = insn.imm.unwrap_int();
+                        self.pc = ((self.pc as i64) + jump_offset) as usize;
+                    }
+                }
+
+                Op::IfNot => {
+                    let test_val = self.pop().unwrap_int();
+
+                    if test_val == 0 {
+                        let jump_offset = insn.imm.unwrap_int();
+                        self.pc = ((self.pc as i64) + jump_offset) as usize;
+                    }
+                }
+
+                Op::Add => {
+                    let arg1 = self.pop().unwrap_int();
+                    let arg0 = self.pop().unwrap_int();
+                    self.push(Value::IntVal(arg0 + arg1));
+                }
+
+                Op::Sub => {
+                    let arg1 = self.pop().unwrap_int();
+                    let arg0 = self.pop().unwrap_int();
+                    self.push(Value::IntVal(arg0 - arg1));
+                }
+
+                // Read an integer value from stdin
+                Op::ReadInt => {
+                    println!("Input an integer value:");
+                    print!("> ");
+                    io::stdout().flush().unwrap();
+
+                    let mut input = String::new();
+                    io::stdin().read_line(&mut input).unwrap();
+                    let n: i64 = input.trim().parse().unwrap();
+                    self.push(Value::IntVal(n));
+                }
+
+                Op::Print => {
+                    let int_val = self.pop().unwrap_int();
+                    println!("print: {}\n", int_val);
+                }
+
+                #[allow(unreachable_patterns)]
+                _ => {
+                    panic!("unknown bytecode instruction in eval {:?}", insn.op);
+                }
+            }
+
+            // Move to the next instruction
+            self.pc += 1;
+        }
+    }
 }
 
 fn main()
@@ -697,7 +653,11 @@ fn main()
     println!("{:?}", args);
 
     if args.len() == 2 {
+        // Parse the source file
         let prog = parse_file(&args[1]);
-        eval(prog);
+
+        // Evaluate the program
+        let mut vm = VM::new();
+        vm.eval(prog);
     }
 }
