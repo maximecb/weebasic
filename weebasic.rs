@@ -663,7 +663,6 @@ fn main()
 {
     // Get the command-line arguments
     let args: Vec<String> = env::args().collect();
-    println!("{:?}", args);
 
     if args.len() == 2 {
         // Parse the source file
@@ -672,5 +671,9 @@ fn main()
         // Evaluate the program
         let mut vm = VM::new();
         vm.eval(prog);
+
+        return;
     }
+
+    println!("Usage: {} <your_script.bas>", args[0]);
 }
