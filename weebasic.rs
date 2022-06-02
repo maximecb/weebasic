@@ -304,13 +304,20 @@ impl Input
 /// Parse an atomic expression
 fn parse_atom(input: &mut Input, prog: &mut Program)
 {
-    let ch = input.peek_char();
+    // Parenthesized sub-expression
+    if input.match_token("(") {
+        parse_expr(input, prog);
+        input.expect_token(")");
+        return;
+    }
 
     // Read an integer from the console
     if input.match_token("read_int") {
         prog.append_insn(Op::ReadInt);
         return;
     }
+
+    let ch = input.peek_char();
 
     // Integer constant
     if ch.is_digit(10) {
@@ -332,13 +339,6 @@ fn parse_atom(input: &mut Input, prog: &mut Program)
         }
 
         prog.append_insn_imm(Op::GetLocal, Value::Idx(local_idx.unwrap()));
-        return;
-    }
-
-    // Parenthesized sub-expression
-    if input.match_token("(") {
-        parse_expr(input, prog);
-        input.expect_token(")");
         return;
     }
 
@@ -433,7 +433,6 @@ fn parse_stmt(input: &mut Input, prog: &mut Program)
         input.expect_token("then");
 
         // If the result is false, jump past the if clause
-        //instr_t* ifnot_insn = APPEND_INSN_IMM(OP_IFNOT, 0);
         let ifnot_insn_idx = prog.insns.len();
         prog.append_insn(Op::IfNot);
 
