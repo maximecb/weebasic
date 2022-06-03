@@ -71,3 +71,9 @@ To get a backtrace, you can set the `RUST_BACKTRACE` environment variable:
 ```
 RUST_BACKTRACE=1 ./weebasic example.bas
 ```
+
+You can also set the `RUST_LOG` environment variable to see `debug!` outputs:
+
+```
+RUST_LOG=debug ./weebasic example.bas
+```

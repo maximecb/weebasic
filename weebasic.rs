@@ -14,6 +14,7 @@
 use std::io;
 use std::io::Write;
 use std::env;
+use std::fmt;
 use std::fs;
 use std::collections::HashMap;
 
@@ -76,6 +77,13 @@ struct Insn
     imm: Value,
 }
 
+impl fmt::Debug for Insn {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Insn {{ op: {:10} imm: {:?} }}", format!("{:?},", self.op), self.imm)
+    }
+}
+
+#[derive(Debug)]
 struct Program
 {
     /// List of instructions
@@ -512,6 +520,11 @@ fn parse_file(file_name: &str) -> Program
     return program;
 }
 
+// A quick immitation of env_logger crate that enables logging with RUST_LOG=debug
+macro_rules! debug {
+    ($($arg:tt)+) => (if env::var("RUST_LOG").is_ok() { println!($($arg)+) })
+}
+
 /// Virtual machine / interpreter
 struct VM
 {
@@ -555,6 +568,7 @@ impl VM
         while self.pc < prog.insns.len() {
             // Read the current instruction
             let insn = &prog.insns[self.pc];
+            debug!("{:3}: {:?}", self.pc, insn);
 
             match insn.op
             {
@@ -667,6 +681,7 @@ fn main()
     if args.len() == 2 {
         // Parse the source file
         let prog = parse_file(&args[1]);
+        debug!("{:#?}", prog);
 
         // Evaluate the program
         let mut vm = VM::new();
