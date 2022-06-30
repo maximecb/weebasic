@@ -40,10 +40,10 @@ enum Op
 #[derive(Clone, Debug)]
 enum Value
 {
-    None,
-    Idx(usize),
-    IntVal(i64),
-    Str(String),
+    None,        // Invalid/uninitialized
+    Idx(usize),  // Index
+    IntVal(i64), // Integer value
+    Str(String), // String value
 }
 
 impl Value
