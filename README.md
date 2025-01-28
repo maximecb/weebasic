@@ -3,10 +3,11 @@
 Toy BASIC-like language and interpreter implemented in Rust for study or interview purposes. The interpreter is intentionally left incomplete so that new features can be implemented as coding exercises. This software is distributed under the Unlicense, meaning it is effectively public domain, though crediting the author is appreciated.
 
 Design:
+- Stack-based bytecode interpreter
 - Top-down recursive descent parser
 - The tokenizer is built directly into the parser
-- Stack-based bytecode interpreter
 - No operator precedence for simplicity
+  - Just use parentheses to nest binary expressions
 - No garbage collector
 
 ## Interview Format

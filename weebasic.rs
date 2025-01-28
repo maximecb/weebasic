@@ -11,8 +11,7 @@
 
 #![allow(dead_code)]
 
-use std::io;
-use std::io::Write;
+use std::io::{stdin, stdout, Write};
 use std::env;
 use std::fmt;
 use std::fs;
@@ -22,13 +21,14 @@ use std::collections::HashMap;
 #[derive(Debug)]
 enum Op
 {
-    Exit,
-    Error,
+    Panic,  // Abort execution
+    Exit,   // Normal exit
     Push,
     GetLocal,
     SetLocal,
     Equal,
     LessThan,
+    Jump,
     IfTrue,
     IfNot,
     Add,
@@ -42,7 +42,7 @@ enum Value
 {
     None,        // Invalid/uninitialized
     Idx(usize),  // Index
-    IntVal(i64), // Integer value
+    Int(i64),    // Integer value
     Str(String), // String value
 }
 
@@ -64,7 +64,7 @@ impl Value
 
     fn unwrap_int(&self) -> i64 {
         match self {
-            Value::IntVal(int_val) => *int_val,
+            Value::Int(int_val) => *int_val,
             _ => panic!("value is not an integer")
         }
     }
@@ -83,7 +83,7 @@ impl fmt::Debug for Insn {
     }
 }
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 struct Program
 {
     /// List of instructions
@@ -95,14 +95,6 @@ struct Program
 
 impl Program
 {
-    fn new() -> Self
-    {
-        Program {
-            insns: Vec::default(),
-            local_idxs: HashMap::default(),
-        }
-    }
-
     /// Append an instruction with no argument
     fn append_insn(&mut self, op: Op)
     {
@@ -330,7 +322,7 @@ fn parse_atom(input: &mut Input, prog: &mut Program)
     // Integer constant
     if ch.is_digit(10) {
         let num = input.parse_int();
-        prog.append_insn_imm(Op::Push, Value::IntVal(num));
+        prog.append_insn_imm(Op::Push, Value::Int(num));
         return;
     }
 
@@ -450,7 +442,7 @@ fn parse_stmt(input: &mut Input, prog: &mut Program)
         // If the condition is false, we jump after the body of the if
         let jumpto_idx = prog.insns.len();
         let jump_offset = (jumpto_idx as i64) - (ifnot_insn_idx as i64) - 1;
-        prog.insns[ifnot_insn_idx].imm = Value::IntVal(jump_offset);
+        prog.insns[ifnot_insn_idx].imm = Value::Int(jump_offset);
 
         return;
     }
@@ -482,10 +474,10 @@ fn parse_stmt(input: &mut Input, prog: &mut Program)
         parse_expr(input, prog);
 
         // If the result is true, jump over the error instruction
-        prog.append_insn_imm(Op::IfTrue, Value::IntVal(1));
+        prog.append_insn_imm(Op::IfTrue, Value::Int(1));
 
         // Exit with an error
-        prog.append_insn(Op::Error);
+        prog.append_insn(Op::Panic);
 
         return;
     }
@@ -504,7 +496,7 @@ fn parse_file(file_name: &str) -> Program
     let mut input = Input::new(input_str);
 
     // Program being compiled
-    let mut program: Program = Program::new();
+    let mut program: Program = Program::default();
 
     // Until we reach the end of the input
     loop
@@ -578,7 +570,7 @@ impl VM
                 }
 
                 // Abort execution
-                Op::Error => {
+                Op::Panic => {
                     panic!("Run-time error\n");
                 }
 
@@ -601,14 +593,20 @@ impl VM
                     let arg1 = self.pop().unwrap_int();
                     let arg0 = self.pop().unwrap_int();
                     let bool_val = if arg0 == arg1 { 1 } else { 0 };
-                    self.push(Value::IntVal(bool_val));
+                    self.push(Value::Int(bool_val));
                 }
 
                 Op::LessThan => {
                     let arg1 = self.pop().unwrap_int();
                     let arg0 = self.pop().unwrap_int();
                     let bool_val = if arg0 < arg1 { 1 } else { 0 };
-                    self.push(Value::IntVal(bool_val));
+                    self.push(Value::Int(bool_val));
+                }
+
+                // Unconditional jump
+                Op::Jump => {
+                    let jump_offset = insn.imm.unwrap_int();
+                    self.pc = ((self.pc as i64) + jump_offset) as usize;
                 }
 
                 // Jump if true
@@ -634,25 +632,25 @@ impl VM
                 Op::Add => {
                     let arg1 = self.pop().unwrap_int();
                     let arg0 = self.pop().unwrap_int();
-                    self.push(Value::IntVal(arg0 + arg1));
+                    self.push(Value::Int(arg0 + arg1));
                 }
 
                 Op::Sub => {
                     let arg1 = self.pop().unwrap_int();
                     let arg0 = self.pop().unwrap_int();
-                    self.push(Value::IntVal(arg0 - arg1));
+                    self.push(Value::Int(arg0 - arg1));
                 }
 
                 // Read an integer value from stdin
                 Op::ReadInt => {
                     println!("Input an integer value:");
                     print!("> ");
-                    io::stdout().flush().unwrap();
+                    stdout().flush().unwrap();
 
                     let mut input = String::new();
-                    io::stdin().read_line(&mut input).unwrap();
+                    stdin().read_line(&mut input).unwrap();
                     let n: i64 = input.trim().parse().unwrap();
-                    self.push(Value::IntVal(n));
+                    self.push(Value::Int(n));
                 }
 
                 // Print a value to stdout (followed by a newline)
